@@ -99,8 +99,9 @@ namespace scrabble_app_backend
 
         public async Task<string> GeminiRequest(ScrabbleBoardInstance b)
         {
-            DotNetEnv.Env.Load();
-            var apiKey = await GetSecret();
+            var secret = await GetSecret();
+            var secretObj = JsonConvert.DeserializeObject<Dictionary<string, string>>(secret);
+            var apiKey = secretObj["GEMINI_API_KEY"];
 
             using (var client = new HttpClient())
             {
@@ -129,8 +130,8 @@ namespace scrabble_app_backend
                 string responseBody = await response.Content.ReadAsStringAsync();
 
                 dynamic parsed = JsonConvert.DeserializeObject(responseBody);
-                string answer = parsed?.candidates?[0]?.content?.parts?[0]?.text ?? "No response from Gemini";
-                return answer;
+                string answer = parsed?["candidates"]?[0]?["content"]?["parts"]?[0]?["text"]?.ToString()
+                    ?? "No response from Gemini"; return answer;
             }
         }
 
