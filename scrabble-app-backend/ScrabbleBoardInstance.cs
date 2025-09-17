@@ -48,25 +48,39 @@ namespace scrabble_app_backend
             };
         }
 
-        public string FormatScrabbleBoard(char?[][]? tilesOnBoard)
+
+        public string FormatSpecialTiles(Dictionary<string, int[][]> specialTiles)
         {
-            if (tilesOnBoard == null) return "(empty board)";
+            var sb = new StringBuilder();
+            sb.AppendLine("Special tiles on the board:");
 
-            var rows = new List<string>();
-
-            foreach (var row in tilesOnBoard)
+            foreach (var kvp in specialTiles)
             {
-                if (row == null)
-                {
-                    rows.Add(new string('.', 15));
-                    continue;
-                }
-
-                var chars = row.Select(c => c.HasValue ? c.Value : '.').ToArray();
-                rows.Add(new string(chars));
+                sb.Append($"{kvp.Key}: ");
+                var coords = kvp.Value.Select(coord => $"({coord[0]},{coord[1]})");
+                sb.AppendLine(string.Join(", ", coords));
             }
 
-            return string.Join("\n", rows);
+            return sb.ToString();
+        }
+
+        public string FormatBoard(char?[][] board)
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("Current Scrabble board (15x15):");
+
+            for (int row = 0; row < board.Length; row++)
+            {
+                for (int col = 0; col < board[row].Length; col++)
+                {
+                    // Show the letter if present, otherwise a dot
+                    char display = board[row][col] ?? '.';
+                    sb.Append(display).Append(' ');
+                }
+                sb.AppendLine(); // new line at the end of the row
+            }
+
+            return sb.ToString();
         }
     }
     

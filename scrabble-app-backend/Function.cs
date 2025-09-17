@@ -23,6 +23,24 @@ namespace scrabble_app_backend
         /// <returns></returns>
         public async Task<APIGatewayProxyResponse> FunctionHandler(APIGatewayProxyRequest request, ILambdaContext context)
         {
+            var corsHeaders = new Dictionary<string, string>
+            {
+                { "Content-Type", "application/json" },
+                { "Access-Control-Allow-Origin", "http://127.0.0.1:5500" },
+                { "Access-Control-Allow-Headers", "Content-Type,x-api-key" },
+                { "Access-Control-Allow-Methods", "OPTIONS,POST" }
+            };
+
+            
+            if (request.HttpMethod == "OPTIONS")
+            {
+                return new APIGatewayProxyResponse
+                {
+                    StatusCode = 200,
+                    Body = "",
+                    Headers = corsHeaders
+                };
+            }
 
             try
             {
@@ -31,12 +49,12 @@ namespace scrabble_app_backend
                     {
                         StatusCode = 400,
                         Body = JsonConvert.SerializeObject(new { error = "Request body is null" }),
-                        Headers = new Dictionary<string, string> { { "Content-Type", "application/json" } }
+                        Headers = corsHeaders
                     };
                 }
-                var board = JsonConvert.DeserializeObject<ScrabbleBoardInstance>(request.Body);
-                board.specialTiles = board.GetSpecialTiles();
-                string response = await GeminiRequest(board);
+                var boardInstance = JsonConvert.DeserializeObject<ScrabbleBoardInstance>(request.Body);
+                boardInstance.specialTiles = boardInstance.GetSpecialTiles();
+                string response = await GeminiRequest(boardInstance);
 
                 
 
@@ -44,10 +62,7 @@ namespace scrabble_app_backend
                 {
                     StatusCode = 200,
                     Body = JsonConvert.SerializeObject(response),
-                    Headers = new Dictionary<string, string>
-                    {
-                        {"Content-Type", "application/json" }
-                    }
+                    Headers = corsHeaders
                 };
             }
             catch (JsonException e)
@@ -58,10 +73,7 @@ namespace scrabble_app_backend
                     StatusCode = 400,
                     Body = JsonConvert.SerializeObject(
                         new { error = $"An error occurred while executing the function {e.Message}" }),
-                    Headers = new Dictionary<string, string>
-                    {
-                        {"Content-Type", "application/json" }
-                    }
+                    Headers = corsHeaders
                 };
             }
 
@@ -113,7 +125,7 @@ namespace scrabble_app_backend
                     new {
                         parts = new[]
                         {
-                            new { text = "I have scrabble tiles: a, s, t, r, y, f, & s. Open tiles to play off of are l, q, n, and p. What are the highest point words I can play?" }
+                            new { text = BuildPrompt(b) }
                         }
                     }
                 }
@@ -135,7 +147,19 @@ namespace scrabble_app_backend
             }
         }
 
-        
+        public string BuildPrompt(ScrabbleBoardInstance b)
+        {
+            StringBuilder prompt = new StringBuilder();
+            prompt.AppendLine("You are helping me find the optimal play in a scrabble game.");
+            prompt.AppendLine($"My availible tiles are: {string.Join(", ", b.playerHand)}");
+            prompt.AppendLine($"The tiles on the board to play off of are: {string.Join(", ", b.FormatBoard(b.tilesOnBoard))}");
+            prompt.AppendLine($"The special tiles on the board are {b.FormatSpecialTiles}\n " +
+                $"Also remember that special tiles already covered by a tile don't count for bonus score");
+            prompt.AppendLine("Here are the rules: Scrabble is a word game played on a 15x15 board. Each player has a rack of 7 letter tiles. Players take turns forming words on the board using their tiles. Words can be placed horizontally or vertically and must connect to existing tiles. \r\n\r\nScoring rules:\r\n- Each letter has a point value; rare letters like Q and Z are worth more.\r\n- The board has special tiles:\r\n    - Double Letter (DL): doubles the point value of the letter on it.\r\n    - Triple Letter (TL): triples the point value of the letter on it.\r\n    - Double Word (DW): doubles the total score of the word that covers it.\r\n    - Triple Word (TW): triples the total score of the word that covers it.\r\n- Using all 7 tiles in one turn (a \"bingo\") gives a 50-point bonus.\r\n- Words must appear in a standard dictionary; abbreviations, proper nouns, and prefixes/suffixes alone are not allowed.\r\n- New words must connect to previously played words. All formed words in the turn must be valid.\r\n- Players can build off letters already on the board, extending words or creating multiple words in one turn.\r\n- The game ends when all tiles are drawn and one player has used all their tiles, or when no more moves are possible. The player with the highest total score wins.\r\n");
+            prompt.AppendLine("In your response, only list off a couple optimal words and where and approx how many points. Very brief, no extra dialogue. The response will be returned in an API call directly, so don't format with \n. Also remember, the given tiles make words horizontally and vertiacally. The words are connected by those tiles I gave. Take your time to find the vertical words on the board. Based on the format it can be difficult");
+            prompt.AppendLine($"After this, to test also list of the words already played on the board, and send back what is stored here: {b.FormatBoard(b.tilesOnBoard)}");
+            return prompt.ToString();
+        }
     }
 
 }
